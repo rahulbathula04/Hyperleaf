@@ -202,8 +202,12 @@
 
     // Source 2: Group Info drawer rows
     if (drawer) {
+      // Also search inside the scrollable panel body for lazy-rendered rows
+      const drawerBody = drawer.querySelector('[data-testid="list-panel"]') ||
+        drawer.querySelector('[data-testid="drawer-body"]') ||
+        drawer;
       const drawerRows = Array.from(
-        drawer.querySelectorAll(
+        drawerBody.querySelectorAll(
           '[role="listitem"], [data-testid="cell-frame-container"], [data-testid="cell-frame"]'
         )
       );
@@ -214,9 +218,15 @@
           row.querySelector('span[dir="auto"][title]') ||
           row.querySelector('span[title]');
         const secondaryEl =
+          row.querySelector('[data-testid="cell-frame-secondary"] span') ||
           row.querySelector('[data-testid="cell-frame-secondary"]') ||
           row.querySelector('span[dir="ltr"]') ||
-          row.querySelector('[data-testid="cell-frame-secondary-detail"]');
+          row.querySelector('[data-testid="cell-frame-secondary-detail"]') ||
+          // Some WA versions render phone as a plain span after the name span
+          Array.from(row.querySelectorAll('span')).find(sp => {
+            const t = (sp.textContent || '').trim();
+            return /^+?d[ds-().]{5,}d$/.test(t);
+          }) || null;
         const label = primaryEl
           ? (primaryEl.getAttribute("title") || primaryEl.textContent || "").trim().replace(/^~/, "")
           : "";
@@ -340,45 +350,93 @@
         e.stopPropagation();
         e.preventDefault();
 
-        // Show loading state
         const originalHTML = btn.innerHTML;
-        btn.innerHTML = "<span style='color:#007AFF;font-size:11.5px;font-weight:600;'>Exporting\u2026</span>";
+        const setStatus = (html) => { btn.innerHTML = html; };
+
         btn.style.pointerEvents = "none";
-        btn.style.opacity = "0.7";
+        btn.style.opacity = "0.75";
+        setStatus("<span style='color:#007AFF;font-size:11px;font-weight:600;'>Opening…</span>");
 
         try {
-          let extracted = extractGroupContactsData();
+          // ── Step 1: Always open Group Info drawer to get phone numbers ──────
+          // The header subtitle only shows truncated names, NOT phone numbers.
+          // Phone numbers only appear in the full Group Info panel.
 
-          // If group info not open, try clicking the group header to open Group Info
-          if ((!extracted || !extracted.ok) && extracted && extracted.error === "empty_group") {
-            const groupInfoTrigger =
+          const getDrawer = () =>
+            document.querySelector('[data-testid="group-info-drawer"]') ||
+            document.querySelector('[data-animate-drawer-right="true"]') ||
+            document.querySelector('[data-testid="drawer-right"]') ||
+            document.querySelector('[data-side="right"] [role="region"]') ||
+            null;
+
+          let drawer = getDrawer();
+
+          if (!drawer) {
+            // Click group header to open Group Info
+            const infoTrigger =
               resolved.header.querySelector('[data-testid="conversation-info-header"]') ||
-              resolved.header.querySelector('[data-icon="default-group"]') ||
+              resolved.header.querySelector('header > div') ||
               resolved.groupNameNode;
-            if (groupInfoTrigger) clickElementFully(groupInfoTrigger);
+            if (infoTrigger) clickElementFully(infoTrigger);
 
-            // Wait up to 5s for the Group Info drawer to load
-            extracted = await waitForCondition(() => {
-              const retry = extractGroupContactsData();
-              return retry && retry.ok ? retry : null;
-            }, 5000, 200);
+            // Wait for drawer to appear (up to 4s)
+            drawer = await waitForCondition(getDrawer, 4000, 150);
           }
 
-          if (!extracted || !extracted.ok) {
-            btn.innerHTML = "<span style='color:#FF3B30;font-size:11px;font-weight:600;'>Open Group Info first</span>";
+          if (!drawer) {
+            setStatus("<span style='color:#FF3B30;font-size:10.5px;font-weight:600;'>Click group name first</span>");
+            setTimeout(() => { btn.innerHTML = originalHTML; }, 2800);
+            return;
+          }
+
+          // ── Step 2: Scroll drawer to load ALL members (lazy loading) ────────
+          setStatus("<span style='color:#007AFF;font-size:11px;font-weight:600;'>Loading…</span>");
+
+          // Scroll the drawer panel to trigger lazy-load of all members
+          const scrollContainer = drawer.querySelector('[data-testid="list-panel"]') ||
+            drawer.querySelector('[data-testid="drawer-body"]') ||
+            drawer.querySelector('[role="region"]') ||
+            drawer;
+
+          let prevCount = 0;
+          let stableRounds = 0;
+          const MAX_SCROLL_ATTEMPTS = 15; // up to ~3s of scrolling
+          for (let i = 0; i < MAX_SCROLL_ATTEMPTS; i++) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            await sleep(200);
+            const rows = scrollContainer.querySelectorAll(
+              '[role="listitem"], [data-testid="cell-frame-container"], [data-testid="cell-frame"]'
+            );
+            if (rows.length === prevCount) {
+              stableRounds++;
+              if (stableRounds >= 3) break; // stable for 600ms = done loading
+            } else {
+              stableRounds = 0;
+              prevCount = rows.length;
+            }
+          }
+
+          // ── Step 3: Extract all member data ─────────────────────────────────
+          const extracted = extractGroupContactsData();
+
+          if (!extracted || !extracted.ok || extracted.entries.length === 0) {
+            setStatus("<span style='color:#FF3B30;font-size:10.5px;font-weight:600;'>No contacts found</span>");
             setTimeout(() => { btn.innerHTML = originalHTML; }, 2500);
             return;
           }
 
+          // ── Step 4: Download CSV ─────────────────────────────────────────────
           download(extracted.filename, extracted.csvText);
 
-          // Success feedback
-          const count = extracted.count || (extracted.entries && extracted.entries.length) || "";
-          btn.innerHTML =
+          const count = extracted.count || extracted.entries.length;
+          const hasPhones = extracted.phones && extracted.phones.length > 0;
+          setStatus(
             "<svg viewBox='0 0 24 24' width='13' height='13' fill='none' stroke='#34C759' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'>" +
             "<polyline points='20 6 9 17 4 12'/></svg>" +
-            `<span style='color:#34C759;font-size:11.5px;font-weight:600;'>${count} saved</span>`;
-          setTimeout(() => { btn.innerHTML = originalHTML; }, 2200);
+            `<span style='color:#34C759;font-size:11.5px;font-weight:600;'>${count}${hasPhones ? " contacts" : " names"}</span>`
+          );
+          setTimeout(() => { btn.innerHTML = originalHTML; }, 2500);
+
         } finally {
           btn.style.pointerEvents = "";
           btn.style.opacity = "";
