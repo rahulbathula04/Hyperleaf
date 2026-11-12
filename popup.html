@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aura Messaging</title>
+  <link rel="stylesheet" href="intlTelInput.css">
+  <link rel="stylesheet" href="aura.css">
+  <script src="lib/popup-vendor.min.js"></script>
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</head>
+
+<body>
+  <div class="aura-shell">
+    <!-- Sticky Frosted macOS Toolbar -->
+    <header class="aura-topbar">
+      <div class="aura-topbar-left">
+        <div class="aura-brand-mark">
+          <img src="img/aura-48.png" alt="Aura">
+          <span class="aura-brand-title">Aura</span>
+        </div>
+
+        <nav class="aura-nav-seg" aria-label="Workspace sections">
+          <button id="navSenderBtn" class="aura-nav-btn active" type="button">Sender</button>
+          <button id="navFeaturesBtn" class="aura-nav-btn" type="button">Features</button>
+        </nav>
+      </div>
+
+      <div class="aura-topbar-right">
+        <span id="statusPill" class="aura-status-pill">
+          <span class="aura-status-dot"></span>
+          <span id="statusText">Not Connected</span>
+        </span>
+
+        <button id="startTourBtn" class="aura-tool-btn" type="button" title="Interactive 3-step guided tour">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9.5"></circle>
+            <path d="M9.5 9a2.5 2.5 0 0 1 5 .8c0 1.7-2.5 2.2-2.5 3.7"></path>
+            <circle cx="12" cy="17.2" r="0.6" fill="currentColor"></circle>
+          </svg>
+          <span>Guide</span>
+        </button>
+
+        <button id="clearAllBtn" class="aura-tool-btn danger hidden" type="button" title="Reset current campaign draft">
+          Clear
+        </button>
+
+        <button id="popoutBtn" class="aura-tool-btn aura-tool-sq" type="button" title="Open in Persistent Window">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h6v6"></path>
+            <path d="M10 14L21 3"></path>
+            <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Launch View (when WhatsApp Web is not open) -->
+    <main id="launchView" class="aura-launch-wrap hidden">
+      <section class="aura-launch-card">
+        <div class="aura-launch-halo">
+          <img src="img/aura-128.png" alt="Aura">
+        </div>
+        <h1 class="aura-launch-title">Connect WhatsApp Web</h1>
+        <p class="aura-launch-desc">
+          Send personalized WhatsApp messages to phone lists, saved groups, or contacts — with time gaps, smart batching, templates, and scheduled dispatch.
+        </p>
+        <div class="aura-feature-pills">
+          <span class="aura-feature-pill">Numbers &amp; CSV/Excel</span>
+          <span class="aura-feature-pill">Groups &amp; Audiences</span>
+          <span class="aura-feature-pill">Batching &amp; Schedule</span>
+          <span class="aura-feature-pill">100% Local</span>
+        </div>
+        <button id="launchWhatsappBtn" class="aura-primary-btn" type="button" style="max-width:240px;margin:0 auto;">
+          Open WhatsApp Web
+        </button>
+      </section>
+    </main>
+
+    <!-- Sender Workspace (Two-Column Apple HIG Workspace) -->
+    <main id="senderWorkspace" class="aura-workspace hidden">
+      <input id="csvFileInput" type="file" accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+      <input id="attachmentFileInput" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,*/*" class="hidden">
+
+      <div class="aura-grid">
+        <!-- LEFT PRIMARY WORKFLOW COLUMN -->
+        <div class="aura-col-main">
+          <!-- 4 Recipient Source Radio Tabs -->
+          <div class="aura-source-tabs" role="tablist" aria-label="Recipient source">
+            <button id="srcNumbersBtn" class="aura-src-tab active" data-src="numbers" type="button">
+              <span class="aura-src-radio"></span>
+              <span>Numbers</span>
+            </button>
+            <button id="srcAudiencesBtn" class="aura-src-tab" data-src="audiences" type="button">
+              <span class="aura-src-radio"></span>
+              <span>Audiences</span>
+            </button>
+            <button id="srcContactsBtn" class="aura-src-tab" data-src="contacts" type="button">
+              <span class="aura-src-radio"></span>
+              <span>Contacts</span>
+            </button>
+            <button id="srcListsBtn" class="aura-src-tab" data-src="lists" type="button">
+              <span class="aura-src-radio"></span>
+              <span>Lists</span>
+            </button>
+          </div>
+
+          <!-- RECIPIENT CARD -->
+          <section id="tourTargetRecipients" class="aura-card aura-recipient-card">
+            <!-- Mode 1: Numbers -->
+            <div id="panelNumbers">
+              <div class="aura-card-header">
+                <span class="aura-card-title">Enter numbers to message</span>
+                <span id="recipientCountBadge" class="aura-badge">0 recipients</span>
+              </div>
+
+              <div id="manualRecipientsWrap" class="aura-phone-shell">
+                <div class="aura-isd-wrap">
+                  <input id="isdCode" class="aura-isd-input" aria-label="Country code">
+                </div>
+                <div id="chipsContainer" class="aura-chips-box">
+                  <input id="numberTextInput" class="aura-chip-input" type="text" placeholder="Enter numbers separated by comma or newline (e.g. 8123456789, 8123987654)">
+                </div>
+              </div>
+
+              <div id="csvSummaryBar" class="aura-csv-bar hidden">
+                <div class="aura-csv-meta">
+                  <span id="csvFileName" class="aura-csv-filename">contacts.csv</span>
+                  <div class="aura-csv-col-wrap">
+                    <span>Col</span>
+                    <select id="phoneColumnSelect" class="aura-select"></select>
+                  </div>
+                </div>
+                <div class="aura-row-actions">
+                  <button id="replaceCsvBtn" class="aura-mini-btn" type="button">Replace</button>
+                  <button id="removeCsvBtn" class="aura-mini-btn danger" type="button" aria-label="Remove imported sheet">&times;</button>
+                </div>
+              </div>
+
+              <div class="aura-recipient-footer">
+                <button id="downloadExampleBtn" class="aura-link-btn" type="button" title="Download sample CSV file">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Example
+                </button>
+
+                <button id="uploadCsvBtn" class="aura-mini-btn" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                  </svg>
+                  Import Excel / CSV
+                </button>
+
+                <div class="aura-campaign-menu-wrap">
+                  <select id="campaignQuickSelect" class="aura-select" title="Campaign number presets">
+                    <option value="">Campaign Numbers ▾</option>
+                    <option value="extract_group">Extract Open Group Members</option>
+                    <option value="save_list">Save Current Numbers as List</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mode 2: Audiences (Groups & Channels) -->
+            <div id="panelAudiences" class="hidden">
+              <div class="aura-card-header">
+                <span class="aura-card-title">Select groups or chats to message</span>
+                <span id="audienceCountBadge" class="aura-badge">0 selected</span>
+              </div>
+
+              <div id="selectedAudiencesTray" class="aura-selected-tray">
+                <span class="aura-tray-empty">No groups selected yet</span>
+              </div>
+
+              <div class="aura-picker-toolbar">
+                <div class="aura-search-box">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input id="audienceSearchInput" type="text" placeholder="Search groups or chats by name...">
+                </div>
+                <label class="aura-chk-inline" title="Select all visible"><input id="selectAllAudiencesChk" type="checkbox"><span>All</span></label>
+                <button id="refreshAudiencesBtn" class="aura-mini-btn" type="button">Refresh</button>
+                <select id="savedAudiencesSelect" class="aura-select" title="Saved Audiences">
+                  <option value="">Saved Audiences ▾</option>
+                  <option value="__save__">+ Save Selected</option>
+                </select>
+              </div>
+
+              <div id="audiencesList" class="aura-pick-list">
+                <div class="aura-list-empty">Click <b>Refresh</b> while WhatsApp Web is open to load your Groups &amp; Chats.</div>
+              </div>
+            </div>
+
+            <!-- Mode 3: Contacts -->
+            <div id="panelContacts" class="hidden">
+              <div class="aura-card-header">
+                <span class="aura-card-title">Select WhatsApp contacts</span>
+                <span id="contactsCountBadge" class="aura-badge">0 selected</span>
+              </div>
+
+              <div class="aura-picker-toolbar">
+                <div class="aura-search-box">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input id="contactSearchInput" type="text" placeholder="Search contacts by name or phone...">
+                </div>
+                <label class="aura-chk-inline"><input id="selectAllContactsChk" type="checkbox"><span>All</span></label>
+                <button id="refreshContactsBtn" class="aura-mini-btn" type="button">Refresh</button>
+              </div>
+
+              <div id="contactsList" class="aura-pick-list">
+                <div class="aura-list-empty">Click <b>Refresh</b> while signed into WhatsApp Web to load contacts.</div>
+              </div>
+            </div>
+
+            <!-- Mode 4: Lists -->
+            <div id="panelLists" class="hidden">
+              <div class="aura-card-header">
+                <span class="aura-card-title">Saved Contact Lists</span>
+                <button id="saveNewListBtn" class="aura-mini-btn" type="button">+ Save Current</button>
+              </div>
+              <div id="savedListsContainer" class="aura-pick-list">
+                <div class="aura-list-empty">No saved lists yet. Enter numbers or import CSV/Excel, then save for reuse.</div>
+              </div>
+            </div>
+
+            <div id="csvError" class="aura-error-text hidden"></div>
+            <div id="csvNotice" class="aura-notice-text hidden"></div>
+          </section>
+
+          <!-- FORMAT STRIP ABOVE MESSAGE CARD (matching Screenshot 1 & 2) -->
+          <div class="aura-format-strip">
+            <div class="aura-fmt-group" title="WhatsApp formatting">
+              <button id="fmtBoldBtn" class="aura-fmt-btn" type="button" title="Bold">*text*</button>
+              <button id="fmtItalicBtn" class="aura-fmt-btn" type="button" title="Italic"><i>_text_</i></button>
+              <button id="fmtStrikeBtn" class="aura-fmt-btn" type="button" title="Strikethrough"><s>~text~</s></button>
+              <button id="fmtMonoBtn" class="aura-fmt-btn" type="button" title="Monospace"><code>`text`</code></button>
+            </div>
+            <div class="aura-row-actions">
+              <button id="emojiBarBtn" class="aura-fmt-pill" type="button">EMOJIS</button>
+              <button id="previewToggleBtn" class="aura-fmt-pill hidden" type="button">Preview</button>
+            </div>
+          </div>
+
+          <!-- MESSAGE COMPOSER CARD -->
+          <section id="tourTargetMessage" class="aura-card aura-message-card">
+            <div class="aura-card-header">
+              <span class="aura-card-title">Enter Message</span>
+              <span id="charCount" class="aura-badge neutral">0 chars</span>
+            </div>
+
+            <textarea id="messageInput" class="aura-textarea" placeholder="Type your message here... Use {{Column}} tags with CSV/Excel."></textarea>
+
+            <div id="variableChipsWrap" class="aura-vars-row hidden">
+              <span class="aura-vars-label">Variables:</span>
+              <div id="variableChipsList" class="aura-vars-list"></div>
+            </div>
+
+            <div id="previewBubble" class="aura-preview-bubble hidden">
+              <div class="aura-preview-label">Row 1 Preview</div>
+              <div id="previewContent"></div>
+            </div>
+
+            <!-- Compact inline Attachment chip (ONLY shown when a file is attached via Paperclip) -->
+            <div id="attachedChipBar" class="aura-attached-bar hidden">
+              <div class="aura-att-mini-left">
+                <img id="attachmentThumb" class="aura-att-mini-thumb hidden" alt="">
+                <span id="attachmentFileBadge" class="aura-att-mini-ext hidden">FILE</span>
+                <span id="attachmentName" class="aura-att-mini-name"></span>
+                <span id="attachmentSize" class="aura-att-mini-size"></span>
+              </div>
+              <div class="aura-row-actions">
+                <div id="sendAsRow" class="aura-seg-group hidden">
+                  <button id="sendAsMediaBtn" class="aura-seg-btn active" type="button">Media</button>
+                  <button id="sendAsDocBtn" class="aura-seg-btn" type="button">Doc</button>
+                </div>
+                <button id="removeAttachmentBtn" class="aura-mini-btn danger" type="button" aria-label="Remove attachment">&times;</button>
+              </div>
+            </div>
+            <div id="attachmentError" class="aura-error-text hidden"></div>
+
+            <!-- Emoji Picker Popover -->
+            <div id="emojiPopover" class="aura-emoji-popover hidden">
+              <button type="button" data-emoji="👋">👋</button>
+              <button type="button" data-emoji="✨">✨</button>
+              <button type="button" data-emoji="🎉">🎉</button>
+              <button type="button" data-emoji="🔥">🔥</button>
+              <button type="button" data-emoji="❤️">❤️</button>
+              <button type="button" data-emoji="✅">✅</button>
+              <button type="button" data-emoji="👍">👍</button>
+              <button type="button" data-emoji="🙏">🙏</button>
+              <button type="button" data-emoji="📞">📞</button>
+              <button type="button" data-emoji="💼">💼</button>
+              <button type="button" data-emoji="🎁">🎁</button>
+              <button type="button" data-emoji="📅">📅</button>
+              <button type="button" data-emoji="🚀">🚀</button>
+              <button type="button" data-emoji="💡">💡</button>
+              <button type="button" data-emoji="🏷️">🏷️</button>
+              <button type="button" data-emoji="⭐">⭐</button>
+            </div>
+
+            <!-- Composer Footer (Emoji + Paperclip + Template Dropdown matching Screenshot 2) -->
+            <div class="aura-composer-footer">
+              <div class="aura-composer-icons">
+                <button id="composerEmojiBtn" class="aura-icon-ghost" type="button" title="Insert Emoji">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                  </svg>
+                </button>
+                <button id="composerAttachBtn" class="aura-icon-ghost" type="button" title="Attach Photo, Video, or Document (Optional)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="aura-template-controls">
+                <select id="templateSelect" class="aura-select" title="Message Templates">
+                  <option value="">Template ▾</option>
+                  <option value="__save__">+ Save Current as Template</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <!-- BOTTOM DISPATCH BAR (Send + Check + Delivery Report matching Screenshots 1–4) -->
+          <div id="tourTargetDispatch" class="aura-dispatch-bar">
+            <button id="sendCampaignBtn" class="aura-primary-btn aura-send-btn" type="button" disabled>
+              <span id="sendCampaignLabel">Send</span>
+            </button>
+            <button id="checkNumbersBtn" class="aura-secondary-btn" type="button" disabled title="Verify active WhatsApp numbers">
+              Check
+            </button>
+            <button id="deliveryReportBtn" class="aura-secondary-btn" type="button">
+              <span>Delivery Report</span>
+              <span id="deliveryCaret">▾</span>
+            </button>
+          </div>
+          <div id="actionError" class="aura-error-text hidden"></div>
+
+          <!-- Collapsible Live Progress & Delivery Report Sheet -->
+          <section id="deliveryDrawer" class="aura-card aura-delivery-drawer hidden">
+            <div id="progressPanel" class="aura-progress-panel hidden">
+              <div class="aura-progress-top">
+                <span id="progressLabel">Sending 0 of 0</span>
+                <span id="progressPercent">0%</span>
+              </div>
+              <div class="aura-progress-track">
+                <div id="progressFill" class="aura-progress-fill"></div>
+              </div>
+              <div class="aura-control-row">
+                <div class="aura-stat-pills">
+                  <span class="aura-stat-pill sent">Sent <b id="sentCount">0</b></span>
+                  <span class="aura-stat-pill failed">Failed <b id="failedCount">0</b></span>
+                </div>
+                <div class="aura-row-actions">
+                  <button id="pauseBtn" class="aura-ctrl-btn pause" type="button">Pause</button>
+                  <button id="resumeBtn" class="aura-ctrl-btn resume hidden" type="button">Resume</button>
+                  <button id="stopBtn" class="aura-ctrl-btn stop" type="button">Stop</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="reportBar" class="aura-report-bar">
+              <div class="aura-stat-pills">
+                <span class="aura-stat-pill sent">Sent <b id="finalSentCount">0</b></span>
+                <span class="aura-stat-pill failed">Failed <b id="finalFailedCount">0</b></span>
+              </div>
+              <div class="aura-row-actions">
+                <button id="downloadReportBtn" class="aura-mini-btn" type="button">Export CSV</button>
+                <button id="dismissReportBtn" class="aura-mini-btn" type="button" aria-label="Dismiss report">Reset</button>
+              </div>
+            </div>
+
+            <div id="deliveryLogList" class="aura-delivery-log">
+              <div class="aura-list-empty">No live campaign log yet.</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT SIDEBAR COLUMN (More Options + Quick Help Guides) -->
+        <aside class="aura-col-side">
+          <section class="aura-card aura-options-card">
+            <h2 class="aura-side-heading">More Options</h2>
+
+            <div class="aura-opt-item">
+              <label class="aura-opt-check">
+                <input id="optTimeGap" type="checkbox" checked>
+                <span>Add a time gap between messages</span>
+              </label>
+              <div id="optTimeGapBody" class="aura-opt-sub">
+                <span>Gap</span>
+                <input id="minGapInput" type="number" min="1" max="120" value="2">
+                <span>to</span>
+                <input id="maxGapInput" type="number" min="1" max="180" value="5">
+                <span>sec</span>
+              </div>
+            </div>
+
+            <div class="aura-opt-item">
+              <label class="aura-opt-check">
+                <input id="optBatching" type="checkbox">
+                <span>Add Batching <em class="aura-rec-tag">(Recommended)</em></span>
+              </label>
+              <div id="optBatchingBody" class="aura-opt-sub hidden">
+                <span>Every</span>
+                <input id="batchSizeInput" type="number" min="1" max="500" value="20">
+                <span>pause</span>
+                <input id="batchPauseInput" type="number" min="5" max="600" value="30">
+                <span>s</span>
+              </div>
+            </div>
+
+            <div class="aura-opt-item">
+              <label class="aura-opt-check">
+                <input id="optSchedule" type="checkbox">
+                <span>Schedule your campaign</span>
+              </label>
+              <div id="optScheduleBody" class="aura-opt-sub aura-sched-sub hidden">
+                <input id="scheduleAtInput" type="datetime-local">
+              </div>
+            </div>
+
+            <div id="activeScheduleBanner" class="aura-schedule-banner hidden">
+              <span id="activeScheduleText">Scheduled</span>
+              <button id="cancelScheduleBtn" class="aura-link-btn danger" type="button">Cancel</button>
+            </div>
+          </section>
+
+          <section class="aura-card aura-guides-card">
+            <button id="guideUseBtn" class="aura-guide-link" type="button">
+              <span class="aura-guide-i">i</span>
+              <span>How to use Aura Sender?</span>
+            </button>
+            <button id="guideAttachBtn" class="aura-guide-link" type="button">
+              <span class="aura-guide-i">i</span>
+              <span>How to send attachments?</span>
+            </button>
+            <button id="guideGroupsBtn" class="aura-guide-link" type="button">
+              <span class="aura-guide-i">i</span>
+              <span>How to send messages to groups?</span>
+            </button>
+          </section>
+
+          <div id="guideSheet" class="aura-card aura-guide-sheet hidden">
+            <div class="aura-card-header">
+              <span id="guideSheetTitle" class="aura-card-title">Guide</span>
+              <button id="closeGuideSheetBtn" class="aura-mini-btn" type="button">&times;</button>
+            </div>
+            <p id="guideSheetBody" class="aura-guide-body"></p>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- Features Tab Workspace -->
+    <main id="featuresWorkspace" class="aura-workspace hidden">
+      <div class="aura-features-grid">
+        <section class="aura-card">
+          <div class="aura-card-header">
+            <span class="aura-card-title">Open Group Member Extractor</span>
+            <span class="aura-badge success">One-Click CSV</span>
+          </div>
+          <p class="aura-feat-desc">
+            Open any WhatsApp Group chat (optionally open Group Info), then extract member phone numbers and names directly into your Numbers tab or export a clean CSV.
+          </p>
+          <button id="featExtractGroupBtn" class="aura-secondary-btn" type="button" style="width:100%;">
+            Extract Open Group Members
+          </button>
+        </section>
+
+        <section class="aura-card">
+          <div class="aura-card-header">
+            <span class="aura-card-title">WhatsApp Number Verifier</span>
+            <span class="aura-badge neutral">Pre-Flight</span>
+          </div>
+          <p class="aura-feat-desc">
+            Validate loaded phone numbers against WhatsApp Web before starting your campaign so unreachable numbers are flagged early without dispatching texts.
+          </p>
+          <button id="featVerifyBtn" class="aura-secondary-btn" type="button" style="width:100%;">
+            Run Check on Current Numbers
+          </button>
+        </section>
+
+        <section class="aura-card aura-feat-wide">
+          <div class="aura-card-header">
+            <span class="aura-card-title">Recent Delivery Reports</span>
+            <span id="historyCountBadge" class="aura-badge">0 campaigns</span>
+          </div>
+          <div id="reportsHistoryList" class="aura-pick-list">
+            <div class="aura-list-empty">Completed campaigns are saved locally here for export.</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Inline Prompt Modal (Save List / Audience / Template cleanly without window.prompt()) -->
+    <div id="saveModalOverlay" class="aura-modal-overlay hidden">
+      <div class="aura-modal-card">
+        <h3 id="saveModalTitle" class="aura-modal-title">Save Item</h3>
+        <input id="saveModalInput" type="text" class="aura-modal-input" placeholder="Enter a name...">
+        <div class="aura-modal-actions">
+          <button id="saveModalCancelBtn" class="aura-secondary-btn" type="button">Cancel</button>
+          <button id="saveModalConfirmBtn" class="aura-primary-btn" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-Step Interactive Spotlight Tour Overlay -->
+    <div id="tourOverlay" class="aura-tour-overlay hidden">
+      <div class="aura-tour-card">
+        <div class="aura-tour-top">
+          <h3 id="tourTitle" class="aura-tour-title">Input Recipient Numbers</h3>
+          <button id="tourCloseBtn" class="aura-tour-close" type="button" aria-label="Close guide">&times;</button>
+        </div>
+        <p id="tourBody" class="aura-tour-body">
+          Enter contact numbers, import Excel/CSV sheets, or select WhatsApp Audiences and Contacts here.
+        </p>
+        <div class="aura-tour-bottom">
+          <span id="tourStepLabel" class="aura-tour-step">1 of 3</span>
+          <div class="aura-row-actions">
+            <button id="tourPrevBtn" class="aura-tour-btn ghost" type="button">&larr; Previous</button>
+            <button id="tourNextBtn" class="aura-tour-btn primary" type="button">Next &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="aura-footer-note">
+      Aura Messaging v3.0 · Apple HIG Edition · 100% Local &amp; Private
+    </footer>
+  </div>
+</body>
+
+</html>

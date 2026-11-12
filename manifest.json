@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Aura Messaging",
+  "version": "3.1.1",
+  "description": "Apple-inspired WhatsApp Web campaign workspace with multi-source recipients, CSV/Excel variables, batching, scheduling, templates, and live delivery reports.",
+  "action": {
+    "default_title": "Open Aura",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "img/aura-16.png",
+      "32": "img/aura-32.png",
+      "48": "img/aura-48.png",
+      "128": "img/aura-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [ "https://web.whatsapp.com/*" ],
+      "js": [ "shared.js", "content.js" ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [ "https://web.whatsapp.com/*" ],
+      "js": [ "attach_bridge.js" ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ],
+  "icons": {
+    "16": "img/aura-16.png",
+    "32": "img/aura-32.png",
+    "48": "img/aura-48.png",
+    "128": "img/aura-128.png"
+  },
+  "permissions": [
+    "notifications",
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*"
+  ]
+}
